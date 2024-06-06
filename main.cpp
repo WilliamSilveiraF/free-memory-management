@@ -2,7 +2,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include "MemoryManager.cpp"
+#include "MemoryManager.h"
 
 void processCommands(const std::string& inputFileName) {
     std::ifstream inputFile(inputFileName);
