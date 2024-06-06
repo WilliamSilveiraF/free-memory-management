@@ -75,11 +75,10 @@ class BitmapMemoryManager:
         print("Not enough memory to allocate.")
         return None
 
-    def free(self, start_address):
-        block_index = start_address // self.block_size
-        # Assuming we know the exact number of blocks that need to be freed, which could be an improvement point
-        self.bitmap.clear_bits(block_index, 1)  # Simplified: only one block freed
-        print(f"Freed memory at block {block_index}")
+    def free(self, start_address, size):
+        num_blocks = (size + self.block_size - 1) // self.block_size
+        self.bitmap.clear_bits(start_address // self.block_size, num_blocks)
+        print(f"Freed {num_blocks} blocks starting from block {start_address // self.block_size}")
 
     def display_memory(self):
         print("Memory Bitmap: " + str(self.bitmap))
@@ -142,16 +141,16 @@ class LinkedListMemoryManager:
         print(f"Allocated {size} bytes at address {block.start}")
         return block.start
 
-    def free(self, address):
+    def free(self, address, size):
         current = self.head
         while current:
-            if current.start == address:
+            if current.start == address and current.size == size and not current.free:
                 current.free = True
                 self.merge_blocks(current)
-                print(f"Freed memory at address {address}")
+                print(f"Freed {size} bytes starting at address {address}")
                 return
             current = current.next
-        print("Invalid free operation.")
+        print("Invalid free operation. No matching block found.")
 
     def merge_blocks(self, block):
         if block.prev and block.prev.free:
@@ -185,28 +184,53 @@ class MemoryManager:
             self.manager = LinkedListMemoryManager(total_memory, block_size, alloc_algorithm)
         else:
             raise ValueError("Unsupported management type")
+        self.id_to_address_size = {}  # Mapeia IDs para endereços e tamanhos
 
-    def allocate(self, size):
-        return self.manager.allocate(size)
+    def allocate(self, size, id):
+        address = self.manager.allocate(size)
+        if address is not None:
+            self.id_to_address_size[id] = (address, size)
+        return address
 
-    def free(self, address):
-        return self.manager.free(address)
+    def free(self, id):
+        if id in self.id_to_address_size:
+            address, size = self.id_to_address_size.pop(id)
+            self.manager.free(address, size)  # Modificado para passar o tamanho também
+            print(f"Successfully freed memory for ID {id} at address {address} covering {size} bytes")
+        else:
+            print(f"ID {id} not found")
 
     def display_memory(self):
         return self.manager.display_memory()
 
+def process_commands(input_file):
+    with open(input_file, 'r') as file:
+        lines = file.readlines()
+
+    management_type = "bitmap" if lines[0].strip() == "1" else "linked_list"
+    total_memory = int(lines[1].strip())
+    block_size = int(lines[2].strip())
+    alloc_algorithm = "first_fit" if lines[3].strip() == "1" else "best_fit"
+
+    memory_manager = MemoryManager(total_memory, block_size, management_type, alloc_algorithm)
+
+    for line in lines[4:]:
+        parts = line.strip().split()
+        if parts[0] == 'A':
+            size = int(parts[1])
+            id = int(parts[2])
+            print(f"Allocating {size} bytes with ID {id}")
+            memory_manager.allocate(size, id)
+        elif parts[0] == 'D':
+            id = int(parts[1])
+            print(f"Deallocating memory with ID {id}")
+            memory_manager.free(id)
+
+    memory_manager.display_memory()
+
 def main():
-    mm = MemoryManager(1024, 4, "linked_list", "best_fit")
-    mm.allocate(512)
-    mm.display_memory()
-    mm.allocate(256)
-    mm.display_memory()
-    mm.free(0)
-    mm.display_memory()
-    mm.allocate(128)
-    mm.display_memory()
-    mm.allocate(64)
-    mm.display_memory()
+    input_file = 'commands.txt'  
+    process_commands(input_file)
 
 if __name__ == "__main__":
     main()
